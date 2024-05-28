@@ -91,9 +91,9 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
                     executeDartCallback(foregroundTaskOptions.callbackHandle)
                 }
             }
-        } catch (SecurityException e) {
-
-            Sysyem.out.println(e.printStackTrace());
+        } catch (e:SecurityException ) {
+          //  e.printStackTrace()
+            //Sysyem.out.println();
             //do smth in this scenario
         }
     }
@@ -268,9 +268,9 @@ class ForegroundService : Service(), MethodChannel.MethodCallHandler {
                         0
                     }
                 )
-            } catch (SecurityException e) {
+            } catch (e:SecurityException) {
 
-                Sysyem.out.println(e.printStackTrace());
+                //Sysyem.out.println(e.printStackTrace());
                 //do smth in this scenario
             }
         } else {
