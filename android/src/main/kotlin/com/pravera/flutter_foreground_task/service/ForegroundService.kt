@@ -279,7 +279,7 @@ class ForegroundService : Service() {
         } catch (e: Exception) {
 
         }
-    }catch (e eX)
+    }
 }
 
 private fun stopForegroundService() {
