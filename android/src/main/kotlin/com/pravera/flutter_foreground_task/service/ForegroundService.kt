@@ -126,49 +126,55 @@ class ForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         loadDataFromPreferences()
+        try {
+            var action = foregroundServiceStatus.action
+            val isSetStopWithTaskFlag = ForegroundServiceUtils.isSetStopWithTaskFlag(this)
 
-        var action = foregroundServiceStatus.action
-        val isSetStopWithTaskFlag = ForegroundServiceUtils.isSetStopWithTaskFlag(this)
-
-        if (action == ForegroundServiceAction.API_STOP) {
-            RestartReceiver.cancelRestartAlarm(this)
-            stopForegroundService()
-            return START_NOT_STICKY
-        }
-
-        if (intent == null) {
-            ForegroundServiceStatus.setData(this, ForegroundServiceAction.RESTART)
-            foregroundServiceStatus = ForegroundServiceStatus.getData(this)
-            action = foregroundServiceStatus.action
-        }
-
-        when (action) {
-            ForegroundServiceAction.API_START,
-            ForegroundServiceAction.API_RESTART -> {
-                startForegroundService()
-                createForegroundTask()
+            if (action == ForegroundServiceAction.API_STOP) {
+                RestartReceiver.cancelRestartAlarm(this)
+                stopForegroundService()
+                return START_NOT_STICKY
             }
-            ForegroundServiceAction.API_UPDATE -> {
-                updateNotification()
-                val prevCallbackHandle = prevForegroundTaskData?.callbackHandle
-                val currCallbackHandle = foregroundTaskData.callbackHandle
-                if (prevCallbackHandle != currCallbackHandle) {
+
+            if (intent == null) {
+                ForegroundServiceStatus.setData(this, ForegroundServiceAction.RESTART)
+                foregroundServiceStatus = ForegroundServiceStatus.getData(this)
+                action = foregroundServiceStatus.action
+            }
+
+            when (action) {
+                ForegroundServiceAction.API_START,
+                ForegroundServiceAction.API_RESTART -> {
+                    startForegroundService()
                     createForegroundTask()
-                } else {
-                    val prevEventAction = prevForegroundTaskOptions?.eventAction
-                    val currEventAction = foregroundTaskOptions.eventAction
-                    if (prevEventAction != currEventAction) {
-                        updateForegroundTask()
+                }
+
+                ForegroundServiceAction.API_UPDATE -> {
+                    updateNotification()
+                    val prevCallbackHandle = prevForegroundTaskData?.callbackHandle
+                    val currCallbackHandle = foregroundTaskData.callbackHandle
+                    if (prevCallbackHandle != currCallbackHandle) {
+                        createForegroundTask()
+                    } else {
+                        val prevEventAction = prevForegroundTaskOptions?.eventAction
+                        val currEventAction = foregroundTaskOptions.eventAction
+                        if (prevEventAction != currEventAction) {
+                            updateForegroundTask()
+                        }
                     }
                 }
+
+                ForegroundServiceAction.REBOOT,
+                ForegroundServiceAction.RESTART -> {
+                    startForegroundService()
+                    createForegroundTask()
+                    Log.d(TAG, "The service has been restarted by Android OS.")
+                }
             }
-            ForegroundServiceAction.REBOOT,
-            ForegroundServiceAction.RESTART -> {
-                startForegroundService()
-                createForegroundTask()
-                Log.d(TAG, "The service has been restarted by Android OS.")
-            }
+        } catch (e: Exception) {
+
         }
+
 
         return if (isSetStopWithTaskFlag) {
             START_NOT_STICKY
@@ -247,346 +253,353 @@ class ForegroundService : Service() {
 
     @SuppressLint("WrongConstant", "SuspiciousIndentation")
     private fun startForegroundService() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            createNotificationChannel()
-        }
 
-        val serviceId = notificationOptions.serviceId
-        val notification = createNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                serviceId,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
-            )
-        } else {
-            startForeground(serviceId, notification)
-        }
 
-        releaseLockMode()
-        acquireLockMode()
-
-        _isRunningServiceState.update { true }
-    }
-
-    private fun stopForegroundService() {
-        releaseLockMode()
-        stopForeground(true)
-        stopSelf()
-
-        _isRunningServiceState.update { false }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun createNotificationChannel() {
-        val channelId = notificationOptions.channelId
-        val channelName = notificationOptions.channelName
-        val channelDesc = notificationOptions.channelDescription
-        val channelImportance = notificationOptions.channelImportance
-
-        val nm = getSystemService(NotificationManager::class.java)
-        if (nm.getNotificationChannel(channelId) == null) {
-            val channel = NotificationChannel(channelId, channelName, channelImportance).apply {
-                if (channelDesc != null) {
-                    description = channelDesc
-                }
-                enableVibration(notificationOptions.enableVibration)
-                if (!notificationOptions.playSound) {
-                    setSound(null, null)
-                }
-                setShowBadge(notificationOptions.showBadge)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                createNotificationChannel()
             }
-            nm.createNotificationChannel(channel)
-        }
-    }
 
-    private fun createNotification(): Notification {
-        // notification icon
-        val icon = notificationContent.icon
-        val iconResId = getIconResId(icon)
-        val iconBackgroundColor = icon?.backgroundColorRgb?.let(::getRgbColor)
-
-        // notification intent
-        val contentIntent = getContentIntent()
-        val deleteIntent = getDeleteIntent()
-
-        // notification actions
-        var needsRebuildButtons = false
-        val prevButtons = prevNotificationContent?.buttons
-        val currButtons = notificationContent.buttons
-        if (prevButtons != null) {
-            if (prevButtons.size != currButtons.size) {
-                needsRebuildButtons = true
+            val serviceId = notificationOptions.serviceId
+            val notification = createNotification()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                        serviceId,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST
+                )
             } else {
-                for (i in currButtons.indices) {
-                    if (prevButtons[i] != currButtons[i]) {
-                        needsRebuildButtons = true
-                        break
-                    }
+                startForeground(serviceId, notification)
+            }
+
+            releaseLockMode()
+            acquireLockMode()
+
+            _isRunningServiceState.update { true }
+        } catch (e: Exception) {
+
+        }
+    }catch (e eX)
+}
+
+private fun stopForegroundService() {
+    releaseLockMode()
+    stopForeground(true)
+    stopSelf()
+
+    _isRunningServiceState.update { false }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+private fun createNotificationChannel() {
+    val channelId = notificationOptions.channelId
+    val channelName = notificationOptions.channelName
+    val channelDesc = notificationOptions.channelDescription
+    val channelImportance = notificationOptions.channelImportance
+
+    val nm = getSystemService(NotificationManager::class.java)
+    if (nm.getNotificationChannel(channelId) == null) {
+        val channel = NotificationChannel(channelId, channelName, channelImportance).apply {
+            if (channelDesc != null) {
+                description = channelDesc
+            }
+            enableVibration(notificationOptions.enableVibration)
+            if (!notificationOptions.playSound) {
+                setSound(null, null)
+            }
+            setShowBadge(notificationOptions.showBadge)
+        }
+        nm.createNotificationChannel(channel)
+    }
+}
+
+private fun createNotification(): Notification {
+    // notification icon
+    val icon = notificationContent.icon
+    val iconResId = getIconResId(icon)
+    val iconBackgroundColor = icon?.backgroundColorRgb?.let(::getRgbColor)
+
+    // notification intent
+    val contentIntent = getContentIntent()
+    val deleteIntent = getDeleteIntent()
+
+    // notification actions
+    var needsRebuildButtons = false
+    val prevButtons = prevNotificationContent?.buttons
+    val currButtons = notificationContent.buttons
+    if (prevButtons != null) {
+        if (prevButtons.size != currButtons.size) {
+            needsRebuildButtons = true
+        } else {
+            for (i in currButtons.indices) {
+                if (prevButtons[i] != currButtons[i]) {
+                    needsRebuildButtons = true
+                    break
                 }
             }
-        } else {
-            needsRebuildButtons = true
         }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val builder = Notification.Builder(this, notificationOptions.channelId)
-            builder.setOngoing(true)
-            builder.setShowWhen(notificationOptions.showWhen)
-            builder.setSmallIcon(iconResId)
-            builder.setContentIntent(contentIntent)
-            builder.setContentTitle(notificationContent.title)
-            builder.setContentText(notificationContent.text)
-            builder.style = Notification.BigTextStyle()
-            builder.setVisibility(notificationOptions.visibility)
-            builder.setOnlyAlertOnce(notificationOptions.onlyAlertOnce)
-            if (iconBackgroundColor != null) {
-                builder.setColor(iconBackgroundColor)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                builder.setDeleteIntent(deleteIntent)
-            }
-
-            val actions = buildNotificationActions(currButtons, needsRebuildButtons)
-            for (action in actions) {
-                builder.addAction(action)
-            }
-
-            return builder.build()
-        } else {
-            val builder = NotificationCompat.Builder(this, notificationOptions.channelId)
-            builder.setOngoing(true)
-            builder.setShowWhen(notificationOptions.showWhen)
-            builder.setSmallIcon(iconResId)
-            builder.setContentIntent(contentIntent)
-            builder.setContentTitle(notificationContent.title)
-            builder.setContentText(notificationContent.text)
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.text))
-            builder.setVisibility(notificationOptions.visibility)
-            builder.setOnlyAlertOnce(notificationOptions.onlyAlertOnce)
-            if (iconBackgroundColor != null) {
-                builder.color = iconBackgroundColor
-            }
-            if (!notificationOptions.enableVibration) {
-                builder.setVibrate(longArrayOf(0L))
-            }
-            if (!notificationOptions.playSound) {
-                builder.setSound(null)
-            }
-            builder.priority = notificationOptions.priority
-
-            val actions = buildNotificationCompatActions(currButtons, needsRebuildButtons)
-            for (action in actions) {
-                builder.addAction(action)
-            }
-
-            return builder.build()
-        }
+    } else {
+        needsRebuildButtons = true
     }
 
-    private fun updateNotification() {
-        val serviceId = notificationOptions.serviceId
-        val notification = createNotification()
-        val nm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            getSystemService(NotificationManager::class.java)
-        } else {
-            // crash 23+
-            ContextCompat.getSystemService(this, NotificationManager::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val builder = Notification.Builder(this, notificationOptions.channelId)
+        builder.setOngoing(true)
+        builder.setShowWhen(notificationOptions.showWhen)
+        builder.setSmallIcon(iconResId)
+        builder.setContentIntent(contentIntent)
+        builder.setContentTitle(notificationContent.title)
+        builder.setContentText(notificationContent.text)
+        builder.style = Notification.BigTextStyle()
+        builder.setVisibility(notificationOptions.visibility)
+        builder.setOnlyAlertOnce(notificationOptions.onlyAlertOnce)
+        if (iconBackgroundColor != null) {
+            builder.setColor(iconBackgroundColor)
         }
-        nm?.notify(serviceId, notification)
-    }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            builder.setDeleteIntent(deleteIntent)
+        }
 
-    @SuppressLint("WakelockTimeout")
-    private fun acquireLockMode() {
-        if (foregroundTaskOptions.allowWakeLock && (wakeLock == null || wakeLock?.isHeld == false)) {
-            wakeLock =
+        val actions = buildNotificationActions(currButtons, needsRebuildButtons)
+        for (action in actions) {
+            builder.addAction(action)
+        }
+
+        return builder.build()
+    } else {
+        val builder = NotificationCompat.Builder(this, notificationOptions.channelId)
+        builder.setOngoing(true)
+        builder.setShowWhen(notificationOptions.showWhen)
+        builder.setSmallIcon(iconResId)
+        builder.setContentIntent(contentIntent)
+        builder.setContentTitle(notificationContent.title)
+        builder.setContentText(notificationContent.text)
+        builder.setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.text))
+        builder.setVisibility(notificationOptions.visibility)
+        builder.setOnlyAlertOnce(notificationOptions.onlyAlertOnce)
+        if (iconBackgroundColor != null) {
+            builder.color = iconBackgroundColor
+        }
+        if (!notificationOptions.enableVibration) {
+            builder.setVibrate(longArrayOf(0L))
+        }
+        if (!notificationOptions.playSound) {
+            builder.setSound(null)
+        }
+        builder.priority = notificationOptions.priority
+
+        val actions = buildNotificationCompatActions(currButtons, needsRebuildButtons)
+        for (action in actions) {
+            builder.addAction(action)
+        }
+
+        return builder.build()
+    }
+}
+
+private fun updateNotification() {
+    val serviceId = notificationOptions.serviceId
+    val notification = createNotification()
+    val nm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        getSystemService(NotificationManager::class.java)
+    } else {
+        // crash 23+
+        ContextCompat.getSystemService(this, NotificationManager::class.java)
+    }
+    nm?.notify(serviceId, notification)
+}
+
+@SuppressLint("WakelockTimeout")
+private fun acquireLockMode() {
+    if (foregroundTaskOptions.allowWakeLock && (wakeLock == null || wakeLock?.isHeld == false)) {
+        wakeLock =
                 (applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager).run {
                     newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ForegroundService:WakeLock").apply {
                         setReferenceCounted(false)
                         acquire()
                     }
                 }
-        }
+    }
 
-        if (foregroundTaskOptions.allowWifiLock && (wifiLock == null || wifiLock?.isHeld == false)) {
-            wifiLock =
+    if (foregroundTaskOptions.allowWifiLock && (wifiLock == null || wifiLock?.isHeld == false)) {
+        wifiLock =
                 (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).run {
                     createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "ForegroundService:WifiLock").apply {
                         setReferenceCounted(false)
                         acquire()
                     }
                 }
+    }
+}
+
+private fun releaseLockMode() {
+    wakeLock?.let {
+        if (it.isHeld) {
+            it.release()
+            wakeLock = null
         }
     }
 
-    private fun releaseLockMode() {
-        wakeLock?.let {
-            if (it.isHeld) {
-                it.release()
-                wakeLock = null
-            }
-        }
-
-        wifiLock?.let {
-            if (it.isHeld) {
-                it.release()
-                wifiLock = null
-            }
+    wifiLock?.let {
+        if (it.isHeld) {
+            it.release()
+            wifiLock = null
         }
     }
+}
 
-    private fun createForegroundTask() {
-        destroyForegroundTask()
+private fun createForegroundTask() {
+    destroyForegroundTask()
 
-        task = ForegroundTask(
+    task = ForegroundTask(
             context = this,
             serviceStatus = foregroundServiceStatus,
             taskData = foregroundTaskData,
             taskEventAction = foregroundTaskOptions.eventAction,
             taskLifecycleListener = taskLifecycleListeners
-        )
-    }
+    )
+}
 
-    private fun updateForegroundTask() {
-        task?.update(taskEventAction = foregroundTaskOptions.eventAction)
-    }
+private fun updateForegroundTask() {
+    task?.update(taskEventAction = foregroundTaskOptions.eventAction)
+}
 
-    private fun destroyForegroundTask() {
-        task?.destroy()
-        task = null
-    }
+private fun destroyForegroundTask() {
+    task?.destroy()
+    task = null
+}
 
-    private fun getIconResId(icon: NotificationIcon?): Int {
-        try {
-            val packageManager = applicationContext.packageManager
-            val packageName = applicationContext.packageName
-            val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-
-            // application icon
-            if (icon == null) {
-                return appInfo.icon
-            }
-
-            // custom icon
-            val metaData = appInfo.metaData
-            if (metaData != null) {
-                return metaData.getInt(icon.metaDataName)
-            }
-
-            return 0
-        } catch (e: Exception) {
-            Log.e(TAG, "getIconResId($icon)", e)
-            return 0
-        }
-    }
-
-    private fun getContentIntent(): PendingIntent {
+private fun getIconResId(icon: NotificationIcon?): Int {
+    try {
         val packageManager = applicationContext.packageManager
         val packageName = applicationContext.packageName
-        val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
-            putExtra(INTENT_DATA_NAME, ACTION_NOTIFICATION_PRESSED)
+        val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
 
-            // set initialRoute
-            val initialRoute = notificationContent.initialRoute
-            if (initialRoute != null) {
-                putExtra("route", initialRoute)
-            }
+        // application icon
+        if (icon == null) {
+            return appInfo.icon
         }
 
-        var flags = PendingIntent.FLAG_UPDATE_CURRENT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags = flags or PendingIntent.FLAG_IMMUTABLE
+        // custom icon
+        val metaData = appInfo.metaData
+        if (metaData != null) {
+            return metaData.getInt(icon.metaDataName)
         }
 
-        return PendingIntent.getActivity(this, RequestCode.NOTIFICATION_PRESSED, intent, flags)
+        return 0
+    } catch (e: Exception) {
+        Log.e(TAG, "getIconResId($icon)", e)
+        return 0
+    }
+}
+
+private fun getContentIntent(): PendingIntent {
+    val packageManager = applicationContext.packageManager
+    val packageName = applicationContext.packageName
+    val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+        putExtra(INTENT_DATA_NAME, ACTION_NOTIFICATION_PRESSED)
+
+        // set initialRoute
+        val initialRoute = notificationContent.initialRoute
+        if (initialRoute != null) {
+            putExtra("route", initialRoute)
+        }
     }
 
-    private fun getDeleteIntent(): PendingIntent {
-        val intent = Intent(ACTION_NOTIFICATION_DISMISSED).apply {
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        flags = flags or PendingIntent.FLAG_IMMUTABLE
+    }
+
+    return PendingIntent.getActivity(this, RequestCode.NOTIFICATION_PRESSED, intent, flags)
+}
+
+private fun getDeleteIntent(): PendingIntent {
+    val intent = Intent(ACTION_NOTIFICATION_DISMISSED).apply {
+        setPackage(packageName)
+    }
+
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        flags = flags or PendingIntent.FLAG_IMMUTABLE
+    }
+
+    return PendingIntent.getBroadcast(this, RequestCode.NOTIFICATION_DISMISSED, intent, flags)
+}
+
+private fun getRgbColor(rgb: String): Int? {
+    val rgbSet = rgb.split(",")
+    return if (rgbSet.size == 3) {
+        Color.rgb(rgbSet[0].toInt(), rgbSet[1].toInt(), rgbSet[2].toInt())
+    } else {
+        null
+    }
+}
+
+private fun getTextSpan(text: String, color: Int?): Spannable {
+    return if (color != null) {
+        SpannableString(text).apply {
+            setSpan(ForegroundColorSpan(color), 0, length, 0)
+        }
+    } else {
+        SpannableString(text)
+    }
+}
+
+private fun buildNotificationActions(
+        buttons: List<NotificationButton>,
+        needsRebuild: Boolean = false
+): List<Notification.Action> {
+    val actions = mutableListOf<Notification.Action>()
+    for (i in buttons.indices) {
+        val intent = Intent(ACTION_NOTIFICATION_BUTTON_PRESSED).apply {
             setPackage(packageName)
+            putExtra(INTENT_DATA_NAME, buttons[i].id)
         }
-
-        var flags = PendingIntent.FLAG_UPDATE_CURRENT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            flags = flags or PendingIntent.FLAG_IMMUTABLE
+        var flags = PendingIntent.FLAG_IMMUTABLE
+        if (needsRebuild) {
+            flags = flags or PendingIntent.FLAG_CANCEL_CURRENT
         }
-
-        return PendingIntent.getBroadcast(this, RequestCode.NOTIFICATION_DISMISSED, intent, flags)
-    }
-
-    private fun getRgbColor(rgb: String): Int? {
-        val rgbSet = rgb.split(",")
-        return if (rgbSet.size == 3) {
-            Color.rgb(rgbSet[0].toInt(), rgbSet[1].toInt(), rgbSet[2].toInt())
+        val textColor = buttons[i].textColorRgb?.let(::getRgbColor)
+        val text = getTextSpan(buttons[i].text, textColor)
+        val pendingIntent =
+                PendingIntent.getBroadcast(this, i + 1, intent, flags)
+        val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Notification.Action.Builder(null, text, pendingIntent).build()
         } else {
-            null
+            Notification.Action.Builder(0, text, pendingIntent).build()
         }
+        actions.add(action)
     }
 
-    private fun getTextSpan(text: String, color: Int?): Spannable {
-        return if (color != null) {
-            SpannableString(text).apply {
-                setSpan(ForegroundColorSpan(color), 0, length, 0)
-            }
-        } else {
-            SpannableString(text)
-        }
-    }
+    return actions
+}
 
-    private fun buildNotificationActions(
+private fun buildNotificationCompatActions(
         buttons: List<NotificationButton>,
         needsRebuild: Boolean = false
-    ): List<Notification.Action> {
-        val actions = mutableListOf<Notification.Action>()
-        for (i in buttons.indices) {
-            val intent = Intent(ACTION_NOTIFICATION_BUTTON_PRESSED).apply {
-                setPackage(packageName)
-                putExtra(INTENT_DATA_NAME, buttons[i].id)
-            }
-            var flags = PendingIntent.FLAG_IMMUTABLE
-            if (needsRebuild) {
-                flags = flags or PendingIntent.FLAG_CANCEL_CURRENT
-            }
-            val textColor = buttons[i].textColorRgb?.let(::getRgbColor)
-            val text = getTextSpan(buttons[i].text, textColor)
-            val pendingIntent =
-                PendingIntent.getBroadcast(this, i + 1, intent, flags)
-            val action = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Notification.Action.Builder(null, text, pendingIntent).build()
-            } else {
-                Notification.Action.Builder(0, text, pendingIntent).build()
-            }
-            actions.add(action)
+): List<NotificationCompat.Action> {
+    val actions = mutableListOf<NotificationCompat.Action>()
+    for (i in buttons.indices) {
+        val intent = Intent(ACTION_NOTIFICATION_BUTTON_PRESSED).apply {
+            setPackage(packageName)
+            putExtra(INTENT_DATA_NAME, buttons[i].id)
         }
-
-        return actions
+        var flags = PendingIntent.FLAG_IMMUTABLE
+        if (needsRebuild) {
+            flags = flags or PendingIntent.FLAG_CANCEL_CURRENT
+        }
+        val textColor = buttons[i].textColorRgb?.let(::getRgbColor)
+        val text = getTextSpan(buttons[i].text, textColor)
+        val pendingIntent =
+                PendingIntent.getBroadcast(this, i + 1, intent, flags)
+        val action = NotificationCompat.Action.Builder(0, text, pendingIntent).build()
+        actions.add(action)
     }
 
-    private fun buildNotificationCompatActions(
-        buttons: List<NotificationButton>,
-        needsRebuild: Boolean = false
-    ): List<NotificationCompat.Action> {
-        val actions = mutableListOf<NotificationCompat.Action>()
-        for (i in buttons.indices) {
-            val intent = Intent(ACTION_NOTIFICATION_BUTTON_PRESSED).apply {
-                setPackage(packageName)
-                putExtra(INTENT_DATA_NAME, buttons[i].id)
-            }
-            var flags = PendingIntent.FLAG_IMMUTABLE
-            if (needsRebuild) {
-                flags = flags or PendingIntent.FLAG_CANCEL_CURRENT
-            }
-            val textColor = buttons[i].textColorRgb?.let(::getRgbColor)
-            val text = getTextSpan(buttons[i].text, textColor)
-            val pendingIntent =
-                PendingIntent.getBroadcast(this, i + 1, intent, flags)
-            val action = NotificationCompat.Action.Builder(0, text, pendingIntent).build()
-            actions.add(action)
-        }
-
-        return actions
-    }
+    return actions
+}
 }
