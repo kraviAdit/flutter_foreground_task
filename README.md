@@ -84,8 +84,6 @@ As mentioned in the Android guidelines, to start a FG service on Android 14+, yo
 > The system permits an app's `dataSync` services to run for a total of 6 hours in a 24-hour period.
 > However, if the user brings the app to the foreground, the timer resets and the app has 6 hours available.
 >
-> There are new restrictions on `BOOT_COMPLETED(autoRunOnBoot)` broadcast receivers launching foreground services.
-> `BOOT_COMPLETED` receivers are not allowed to launch the following types of foreground services:
 > - [dataSync](https://developer.android.com/develop/background-work/services/fg-service-types#data-sync)
 > - [camera](https://developer.android.com/develop/background-work/services/fg-service-types#camera)
 > - [mediaPlayback](https://developer.android.com/develop/background-work/services/fg-service-types#media)

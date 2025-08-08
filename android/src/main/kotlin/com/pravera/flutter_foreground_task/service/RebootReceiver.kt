@@ -13,7 +13,7 @@ import com.pravera.flutter_foreground_task.models.ForegroundTaskOptions
 import com.pravera.flutter_foreground_task.utils.ForegroundServiceUtils
 
 /**
- * The receiver that receives the BOOT_COMPLETED and MY_PACKAGE_REPLACED intent.
+ * The receiver that receives the MY_PACKAGE_REPLACED intent.
  *
  * @author Dev-hwang
  * @version 1.0
